@@ -235,6 +235,34 @@ void ExtractData() {
   data_length_ = data_mat_.size();
 }
 
+
+float LowPassFilter01(const float& data,const float& alpha) {
+  static bool first_flag = true;
+  static float filtered_data = 0.0;
+
+  if (first_flag) {  // first time enter
+    first_flag = false;
+    filtered_data = data;
+  } else {
+    filtered_data = alpha * data + (1.0f - alpha) * filtered_data;
+  }
+  return filtered_data;
+}
+
+float LowPassFilter02(const float& data,const float& alpha) {
+  static bool first_flag = true;
+  static float filtered_data = 0.0;
+
+  if (first_flag) {  // first time enter
+    first_flag = false;
+    filtered_data = data;
+  } else {
+    filtered_data = alpha * data + (1.0f - alpha) * filtered_data;
+  }
+  return filtered_data;
+}
+
+
 /*
  * ---------数据回放使用方法----------：
  * 执行命令：./csvPlt+"播放速度设置“+”播放位置设置“+”csv文件夹序号“+”csv文件夹内部文件序号“
@@ -255,7 +283,10 @@ int main(int argc, char *argv[]) {
     if (!KeyboardCtrl(i)) break;
     int64_t start_time = TimeToolKit::TimeSpecSysCurrentMs();
     auto data_row = data_mat_[i];
-    Animator->SetData(data_row[0], data_row[1], data_row[2], data_row[3]);
+    data_row.push_back(LowPassFilter01(data_row[1],0.05));
+    data_row.push_back(LowPassFilter02(data_row[1],0.1));
+    data_row[0]*=2;
+    Animator->SetData(data_row);
     /*------动画显示-----*/
     Animator->Monitor(600);
     int64_t end_time = TimeToolKit::TimeSpecSysCurrentMs();

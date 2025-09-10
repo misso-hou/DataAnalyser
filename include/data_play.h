@@ -29,8 +29,13 @@ bool pause_;
 bool erase_;
 bool back_;
 bool blade_;
+//低通滤波
+float filtered_data01_ = 0.0;
+float filtered_data02_ = 0.0;
 
 /*读csv数据函数*/
+float LowPassFilter01(const float& data,const float& alpha);
+float LowPassFilter02(const float& data,const float& alpha);
 vector<vector<float>> RowDataReader(string file_name, int row_num, int bias_index);
 // 按键控制相关函数
 char GetKey();

@@ -19,6 +19,7 @@ namespace animation {
 using namespace std;
 namespace py = pybind11;
 namespace mpl = matplotlibcpp17;
+using matplotlibcpp17::gridspec::GridSpec;
 
 using mesh2D = vector<vector<float>>;
 
@@ -30,7 +31,7 @@ class Animation : public utilities::Singleton<Animation> {
   ~Animation() {}
 
  public:
-  void SetData(const float& speed, const float& yaw_rate, const float& torque, const float& angle);
+  void SetData(const vector<float>& new_data);
   void Monitor(int buffer_length);
   void InitializePlt();
 
@@ -39,20 +40,20 @@ class Animation : public utilities::Singleton<Animation> {
 
  private:
   //画框
-  mpl::pyplot::PyPlot cmd_plt_;
+  mpl::pyplot::PyPlot data_plt_;
   //轴系
-  shared_ptr<mpl::axes::Axes> cmd_axes_ptr_;     //速度监视器轴系
+  shared_ptr<mpl::gridspec::GridSpec> data_gs_ptr_;
+  shared_ptr<mpl::axes::Axes> data_axes01_ptr_;     //速度监视器轴系
+  shared_ptr<mpl::axes::Axes> data_axes02_ptr_;     //速度监视器轴系
+  shared_ptr<mpl::axes::Axes> data_axes03_ptr_;     //速度监视器轴系
   // figure
-  shared_ptr<mpl::figure::Figure> cmd_figure_ptr_;
+  shared_ptr<mpl::figure::Figure> data_figure_ptr_;
   // background
-  py::object cmd_background_;
+  py::object data_background_;
   py::object jet_cmap_;
 
   // data
-  float speed_; 
-  float yaw_rate_; 
-  float torque_; 
-  float angle_;
+  vector<float> plt_data_;
 
 };
 }  // namespace animation
