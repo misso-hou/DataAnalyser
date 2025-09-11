@@ -34,8 +34,11 @@ class Animation : public utilities::Singleton<Animation> {
   void SetData(const vector<float>& new_data);
   void Monitor(int buffer_length);
   void InitializePlt();
+  void BarPlot01(const std::unordered_map<int, int>& frequency,const std::unordered_map<int, int>& frequency02);
+  void BarPlot02(const std::unordered_map<int, int>& frequency);
 
  private:
+  void BarPltInit(const pybind11::dict& fig_kwargs); 
   void CmdPltInit(const pybind11::dict& fig_kwargs, const float& x_axis_range);
 
  private:
@@ -43,13 +46,19 @@ class Animation : public utilities::Singleton<Animation> {
   mpl::pyplot::PyPlot data_plt_;
   //轴系
   shared_ptr<mpl::gridspec::GridSpec> data_gs_ptr_;
-  shared_ptr<mpl::axes::Axes> data_axes01_ptr_;     //速度监视器轴系
-  shared_ptr<mpl::axes::Axes> data_axes02_ptr_;     //速度监视器轴系
-  shared_ptr<mpl::axes::Axes> data_axes03_ptr_;     //速度监视器轴系
+  shared_ptr<mpl::axes::Axes> data_axes01_ptr_;
+  shared_ptr<mpl::axes::Axes> data_axes02_ptr_;
+  shared_ptr<mpl::axes::Axes> data_axes03_ptr_;
+  shared_ptr<mpl::axes::Axes> bar_axes_ptr_;
+  shared_ptr<mpl::axes::Axes> bar02_axes_ptr_;
   // figure
   shared_ptr<mpl::figure::Figure> data_figure_ptr_;
+  shared_ptr<mpl::figure::Figure> bar_figure_ptr_;
+  shared_ptr<mpl::figure::Figure> bar02_figure_ptr_;
   // background
   py::object data_background_;
+  py::object bar_background_;
+  py::object bar02_background_;
   py::object jet_cmap_;
 
   // data

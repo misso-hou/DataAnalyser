@@ -8,6 +8,16 @@
 #include "animation.h"
 #include "facilities/base_time_struct.h"
 
+#include <matplotlibcpp17/pyplot.h>
+#include "weighted_window_mode.h"
+
+#include <algorithm>
+#include <vector>
+#include <iomanip>
+
+using namespace std;
+using namespace matplotlibcpp17;
+
 using namespace std;
 namespace Anim = modules::animation;
 Anim::Animation *Animator = Anim::Animation::GetInstance();
@@ -272,23 +282,32 @@ float LowPassFilter02(const float& data,const float& alpha) {
  * csv文件内部默认只有一组数据
  */
 int main(int argc, char *argv[]) {
+  WeightedWindows windows(800,200);
   pybind11::scoped_interpreter guard{};
   SetParam(argc, argv);
   ExtractData();
   Animator->InitializePlt();
   for (int i = start_index_; i < data_length_;)  //数据行遍历
   {
-    cout << "debug 02:" << i << endl;
     //键盘控制
     if (!KeyboardCtrl(i)) break;
     int64_t start_time = TimeToolKit::TimeSpecSysCurrentMs();
     auto data_row = data_mat_[i];
-    data_row.push_back(LowPassFilter01(data_row[1],0.05));
-    data_row.push_back(LowPassFilter02(data_row[1],0.1));
+    auto filter_torque01 = LowPassFilter01(data_row[1],0.05);
+    auto filter_torque02 = LowPassFilter02(data_row[1],0.1);
+    data_row.push_back(filter_torque01);
+    data_row.push_back(filter_torque02);
     data_row[0]*=2;
+    auto mode = windows.getWeightedMode(filter_torque02,data_row[2],data_row[0]);
+    cout << "debug 02: tick->" << i << "; mode:" << mode << endl;
+    data_row.push_back(mode);
     Animator->SetData(data_row);
     /*------动画显示-----*/
     Animator->Monitor(600);
+    auto freq01 = windows.GetLongFreqency();
+    // Animator->BarPlot01(freq01);
+    auto freq02 = windows.GetShortFreqency();
+    Animator->BarPlot01(freq01,freq02);
     int64_t end_time = TimeToolKit::TimeSpecSysCurrentMs();
     int64_t remaining_T = cycle_time_ - (end_time - start_time);
     if (remaining_T > 0) {
@@ -300,3 +319,36 @@ int main(int argc, char *argv[]) {
   return 0;
   pybind11::finalize_interpreter();
 }
+
+
+
+// int main(int argc, char *argv[]) {
+//   pybind11::scoped_interpreter guard{};
+//   const vector<int> menMeans = {20, 35, 30, 35, -27};
+//   const vector<int> womenMeans = {25, 32, 34, 20, -25};
+//   const vector<int> menStd = {2, 3, 4, 1, 2};
+//   const vector<int> womenStd = {3, 5, 2, 3, 3};
+//   const vector<int> ind = {0, 1, 2, 3, 4}; // the x locations for the groups
+//   const double width =
+//       0.35; // the width of the bars: can also be len(x) sequence
+//   auto plt = matplotlibcpp17::pyplot::import();
+//   auto [fig, ax] = plt.subplots();
+//   auto p1 = ax.bar(Args(ind, menMeans, width),
+//                    Kwargs("yerr"_a = menStd, "label"_a = "Men"));
+//   auto p2 = ax.bar(
+//       Args(ind, womenMeans, width),
+//       Kwargs("bottom"_a = menMeans, "yerr"_a = womenStd, "label"_a = "Women"));
+//   ax.axhline(Args(0), Kwargs("color"_a = "grey", "linewidth"_a = 0.8));
+//   ax.set_ylabel(Args("Scores"));
+//   ax.set_title(Args("Scores by group and gender"));
+//   ax.set_xticks(Args(ind, py::make_tuple("G1", "G2", "G3", "G4", "G5")));
+//   ax.legend();
+
+//   // // Label with label_type 'center' instead of the default 'edge'
+//   // ax.bar_label(Args(p1.unwrap()), Kwargs("label_type"_a = "center"));
+//   // ax.bar_label(Args(p2.unwrap()), Kwargs("label_type"_a = "center"));
+//   // ax.bar_label(Args(p2.unwrap()));
+//   plt.show();
+//   pybind11::finalize_interpreter();
+// }
+

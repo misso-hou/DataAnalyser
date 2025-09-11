@@ -3,12 +3,15 @@
 #include <filesystem>
 #include <iostream>
 
+#include "weighted_window_mode.h"
+
 namespace modules {
 namespace animation {
 
 const float CMD_X_RANGE = 100;
 const int DURATION = 50;
 const int Y_RANGE = 10;
+const float BAR_X = 3.0;
 
 // canvas and flush events
 auto canvas_update_flush_events = [](pybind11::object figure) {
@@ -39,6 +42,34 @@ void Animation::InitializePlt() {
   /***速度监视器***/
   pybind11::dict cmd_kwargs("figsize"_a = py::make_tuple(14, 7), "dpi"_a = 100, "tight_layout"_a = true);
   CmdPltInit(cmd_kwargs, CMD_X_RANGE);
+  BarPltInit(cmd_kwargs);
+}
+
+void Animation::BarPltInit(const pybind11::dict& fig_kwargs) {
+  auto plt = mpl::pyplot::import();  
+  auto [figure, axes] = plt.subplots();                              
+  // mpl::figure::Figure figure = plt.figure(Args(), fig_kwargs); 
+  bar_figure_ptr_ = make_shared<mpl::figure::Figure>(figure);    
+  bar_axes_ptr_ = make_shared<mpl::axes::Axes>(axes);    
+  bar_axes_ptr_->set_xlim(Args(-BAR_X/2, BAR_X/2));
+  bar_axes_ptr_->set_ylim(Args(-100, 200.0));  
+  plt.show(Args(), Kwargs("block"_a = 0));
+  plt.grid(Args(true), Kwargs("linestyle"_a = "--", "linewidth"_a = 0.5, "color"_a = "black", "alpha"_a = 0.5));
+  bar_axes_ptr_->set_title(Args("long window"));
+  plt.pause(Args(0.1));
+  bar_background_ = canvas_copy_from_bbox(bar_figure_ptr_->unwrap());
+  //-----------
+  // auto [figure02, axes02] = plt.subplots();                              
+  // // mpl::figure::Figure figure = plt.figure(Args(), fig_kwargs); 
+  // bar02_figure_ptr_ = make_shared<mpl::figure::Figure>(figure02);    
+  // bar02_axes_ptr_ = make_shared<mpl::axes::Axes>(axes02);    
+  // bar02_axes_ptr_->set_xlim(Args(-BAR_X/2, BAR_X/2));
+  // bar02_axes_ptr_->set_ylim(Args(-0.1, 100.0));  
+  // plt.show(Args(), Kwargs("block"_a = 0));
+  // plt.grid(Args(true), Kwargs("linestyle"_a = "--", "linewidth"_a = 0.5, "color"_a = "black", "alpha"_a = 0.5));
+  // bar02_axes_ptr_->set_title(Args("short window"));
+  // plt.pause(Args(0.1));
+  // bar02_background_ = canvas_copy_from_bbox(bar02_figure_ptr_->unwrap());
 }
 
 void Animation::CmdPltInit(const pybind11::dict& fig_kwargs, const float& x_axis_range) {
@@ -99,7 +130,11 @@ void Animation::Monitor(int buffer_length) {
   /******数据计算******/
   /*step01->实时数据更新*/
   static vector<float> time_array;
-  time_array.push_back(duration_time*5);
+  static float test_tick = 0;
+  test_tick += 0.4;
+  time_array.push_back(test_tick);
+  // time_array.push_back(duration_time*5);
+
   int data_num = plt_data_.size();
   static mesh2D line_data(data_num);
   static vector<py::object> lines_artist(data_num);
@@ -114,7 +149,7 @@ void Animation::Monitor(int buffer_length) {
     }
   }
   /*step02->static artist生成*/
-  static vector<string> colors = {"r", "b","blueviolet","g" ,"cyan","gold"};
+  static vector<string> colors = {"silver", "b","blueviolet","g" ,"cyan","gold","r"};
   if (once_flag) {
     once_flag = false;
     for (int i = 0; i < line_data.size(); i++) {
@@ -151,6 +186,157 @@ void Animation::Monitor(int buffer_length) {
   }
   canvas_update_flush_events(data_figure_ptr_->unwrap());
 }
+
+
+void Animation::BarPlot01(const std::unordered_map<int, int>& frequency01,const std::unordered_map<int, int>& frequency02) {
+  static bool once_flag = true;
+  canvas_restore_region(bar_figure_ptr_->unwrap(), bar_background_);
+  /******数据计算******/
+  /*step02->static artist生成*/
+  const int num = BAR_X/RESOLUTION;
+  static vector<py::object> bar_artists(num);
+  static vector<py::object> bar02_artists(num);
+  // std::unordered_map<int, int> frequency;
+  static vector<float> bin(num);
+  static vector<float> nums(num);
+  if(once_flag){
+    once_flag = false;
+    for(int i=0;i<num;i++){
+      bin[i] = -BAR_X/2 + RESOLUTION*i;
+      nums[i] = 0;
+    }
+    auto artists = bar_axes_ptr_->bar(Args(bin, nums, RESOLUTION/1.5),Kwargs("color"_a = "blue")).unwrap().cast<py::list>();
+    auto artists02 = bar_axes_ptr_->bar(Args(bin, nums, RESOLUTION/1.5),Kwargs("color"_a = "green")).unwrap().cast<py::list>();
+    for(int i=0;i<num;i++){
+      bar_artists[i] = artists[i];
+      bar02_artists[i] = artists02[i];
+    }
+  }
+  /*step03->artist实时数据更新并绘制*/
+  int max_num = 0;
+  for (const auto pair : frequency01){
+    float index = pair.first+BAR_X/(2*RESOLUTION);
+    bar_artists[index].attr("set_height")(pair.second);
+    bar_axes_ptr_->unwrap().attr("draw_artist")(bar_artists[index]);
+    if(max_num<pair.second){
+      max_num = pair.second;
+    }
+  }
+
+  int max_num02 = 0;
+  for (const auto pair : frequency02){
+    float index = pair.first+BAR_X/(2*RESOLUTION);
+    bar02_artists[index].attr("set_height")(-pair.second);
+    bar_axes_ptr_->unwrap().attr("draw_artist")(bar02_artists[index]);
+    if(max_num02<pair.second){
+      max_num02 = pair.second;
+    }
+  }
+
+  pybind11::list axes_ylim = bar_axes_ptr_->unwrap().attr("get_ylim")();
+  int y_min = axes_ylim[0].cast<float>();
+  int y_max = axes_ylim[1].cast<float>();
+  bool change = false;
+  if (max_num > (y_max - 5)) {
+    y_max = max_num + 5;
+    change = true;
+  }
+  if(-max_num02 < (y_min + 5)) {
+    change = true;
+    y_min = -max_num02 - 5;
+  }
+  if(change){
+    bar_axes_ptr_->unwrap().attr("set_ylim")(Args(y_min, y_max));
+  }
+
+  canvas_update_flush_events(bar_figure_ptr_->unwrap());
+}
+
+
+// void Animation::BarPlot01(const std::unordered_map<int, int>& frequency) {
+//   static bool once_flag = true;
+//   canvas_restore_region(bar_figure_ptr_->unwrap(), bar_background_);
+//   /******数据计算******/
+//   /*step02->static artist生成*/
+//   const int num = BAR_X/RESOLUTION;
+//   static vector<py::object> bar_artists(num);
+//   // std::unordered_map<int, int> frequency;
+//   static vector<float> bin(num);
+//   static vector<float> nums(num);
+//   if(once_flag){
+//     once_flag = false;
+//     for(int i=0;i<num;i++){
+//       bin[i] = -BAR_X/2 + RESOLUTION*i;
+//       nums[i] = 0;
+//     }
+//     auto artists = bar_axes_ptr_->bar(Args(bin, nums, RESOLUTION/1.5)).unwrap().cast<py::list>();
+//     for(int i=0;i<num;i++){
+//       bar_artists[i] = artists[i];
+//     }
+//   }
+//   /*step03->artist实时数据更新并绘制*/
+//   int max_num = 0;
+//   for (const auto pair : frequency){
+//     float index = pair.first+BAR_X/(2*RESOLUTION);
+//     bar_artists[index].attr("set_height")(pair.second);
+//     bar_axes_ptr_->unwrap().attr("draw_artist")(bar_artists[index]);
+//     if(max_num<pair.second){
+//       max_num = pair.second;
+//     }
+//   }
+
+//   pybind11::list axes_ylim = bar_axes_ptr_->unwrap().attr("get_ylim")();
+//   if (max_num > axes_ylim[1].cast<float>() - 5) {
+//     float y_min = 0;
+//     float y_max = max_num + 5;
+//     bar_axes_ptr_->unwrap().attr("set_ylim")(Args(0, y_max));
+//   }
+
+//   canvas_update_flush_events(bar_figure_ptr_->unwrap());
+// }
+
+void Animation::BarPlot02(const std::unordered_map<int, int>& frequency) {
+  static bool once_flag = true;
+  canvas_restore_region(bar02_figure_ptr_->unwrap(), bar02_background_);
+  /******数据计算******/
+  /*step02->static artist生成*/
+  const int num = BAR_X/RESOLUTION;
+  static vector<py::object> bar_artists(num);
+  // std::unordered_map<int, int> frequency;
+  static vector<float> bin(num);
+  static vector<float> nums(num);
+  if(once_flag){
+    once_flag = false;
+    for(int i=0;i<num;i++){
+      bin[i] = -BAR_X/2 + RESOLUTION*i;
+      nums[i] = 0;
+    }
+    auto artists = bar02_axes_ptr_->bar(Args(bin, nums, RESOLUTION/1.5)).unwrap().cast<py::list>();
+    for(int i=0;i<num;i++){
+      bar_artists[i] = artists[i];
+    }
+  }
+  /*step03->artist实时数据更新并绘制*/
+  int max_num = 0;
+  for (const auto pair : frequency){
+    float index = pair.first+BAR_X/(2*RESOLUTION);
+    bar_artists[index].attr("set_height")(pair.second);
+    bar02_axes_ptr_->unwrap().attr("draw_artist")(bar_artists[index]);
+    if(max_num<pair.second){
+      max_num = pair.second;
+    }
+  }
+
+  pybind11::list axes_ylim = bar02_axes_ptr_->unwrap().attr("get_ylim")();
+  if (max_num > axes_ylim[1].cast<float>() - 5) {
+    float y_min = 0;
+    float y_max = max_num + 5;
+    bar02_axes_ptr_->unwrap().attr("set_ylim")(Args(0, y_max));
+  }
+
+  canvas_update_flush_events(bar02_figure_ptr_->unwrap());
+}
+
 
 }
 }
