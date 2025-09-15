@@ -239,7 +239,7 @@ void SetParam(int argc, char *argv[]) {
  */
 void ExtractData() {
   //数据文件路径
-  string data_file = "/home/workspace/csvLog/test_data.csv";
+  string data_file = "../data/test_data.csv";
   //数据提取
   data_mat_ = RowDataReader(data_file, 1, 1);
   data_length_ = data_mat_.size();
@@ -282,7 +282,7 @@ float LowPassFilter02(const float& data,const float& alpha) {
  * csv文件内部默认只有一组数据
  */
 int main(int argc, char *argv[]) {
-  WeightedWindows windows(800,200);
+  WeightedWindows windows(300,100);
   pybind11::scoped_interpreter guard{};
   SetParam(argc, argv);
   ExtractData();
